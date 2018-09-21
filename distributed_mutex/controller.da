@@ -244,6 +244,9 @@ class Controller(process):
         jsondata['Wallclock_time'] = t2 - t1
         jsonoutput = json.dumps(jsondata)
         print("###OUTPUT: " + jsonoutput)
+        f = open("performance_logs", "w")
+        f.write(jsonoutput)
+        f.close()
 
         time.sleep(1)
 

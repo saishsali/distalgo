@@ -1,6 +1,77 @@
 import subprocess
 import sys
 import random
+import json
+from prettytable import PrettyTable
+
+algorithms = ['orig.da', 'spec.da', 'lamport.da']
+
+def get_performance_parameters():
+    f = open("performance_logs", "r")
+    return json.loads(f.readline())['All']
+
+def get_average_performance(performance_params):
+    average_performance = {}
+    for performance_param in performance_params:
+        for key, value in performance_param.items():
+            average_performance[key] = average_performance.get(key, 0) + \
+                                        performance_param[key]
+
+    for key, value in average_performance.items():
+        average_performance[key] /= len(performance_params)
+        average_performance[key] = round(average_performance[key], 5)
+
+    return average_performance
+
+# Correctness testing
+def correctness_testing(pp, rr, nn):
+    for _ in range(nn):
+        proc = random.randint(1, pp)
+        req = random.randint(1, rr)
+        for algo in algorithms:
+            subprocess.call("python3 -m da {} {} {}".format(algo, proc, req)
+                            .split(" "))
+
+# Performance testing
+def performance_testing(pp, rr, dd, aa):
+    rb = [ii for ii in range(1, rr + 1) if ii % (rr / dd) == 0]
+    pb = [ii for ii in range(1, pp + 1) if ii % (pp / dd) == 0]
+
+    request_table = PrettyTable()
+    request_table.field_names = ["Algorithm", "Total Processes", "Requests",
+                                 "Total user time", "Total system time",
+                                 "Total process time", "Total memory"]
+
+    for req in rb:
+        for algo in algorithms:
+            performance = []
+            for _ in range(aa):
+                subprocess.call("python3 -m da {} {} {}".format(algo, pp, req)
+                                .split(" "))
+                performance.append(get_performance_parameters())
+            avg_perf = get_average_performance(performance)
+            request_table.add_row([algo, pp, req, avg_perf['Total_user_time'],
+                avg_perf['Total_system_time'], avg_perf['Total_process_time'],
+                avg_perf['Total_memory']]);
+
+    process_table = PrettyTable()
+    process_table.field_names = ["Algorithm", "Total Processes", "Requests",
+                                 "Total user time", "Total system time",
+                                 "Total process time", "Total memory"]
+    for proc in pb:
+        for algo in algorithms:
+            performance = []
+            for _ in range(aa):
+                subprocess.call("python3 -m da {} {} {}".format(algo, proc, rr)
+                                .split(" "))
+                performance.append(get_performance_parameters())
+            avg_perf = get_average_performance(performance)
+            process_table.add_row([algo, proc, rr, avg_perf['Total_user_time'],
+                avg_perf['Total_system_time'], avg_perf['Total_process_time'],
+                avg_perf['Total_memory']]);
+
+    print(request_table)
+    print(process_table)
 
 def main():
     pp = int(sys.argv[1]) if len(sys.argv) > 1 else 1
@@ -9,39 +80,5 @@ def main():
     dd = int(sys.argv[4]) if len(sys.argv) > 4 else 1
     aa = int(sys.argv[5]) if len(sys.argv) > 5 else 1
 
-    # Correctness testing
-    for _ in range(nn):
-        proc = random.randint(1, pp)
-        req = random.randint(1, rr)
-        subprocess.call("python3 -m da orig.da {} {}".format(proc, req)
-                        .split(" "))
-        subprocess.call("python3 -m da spec.da {} {}".format(proc, req)
-                        .split(" "))
-        subprocess.call("python3 -m da lamport.da {} {}".format(proc, req)
-                        .split(" "))
-
-    rb = [ii for ii in range(1, rr + 1) if ii % (rr / dd) == 0]
-    pb = [ii for ii in range(1, pp + 1) if ii % (pp / dd) == 0]
-
-    # Performance testing
-    for _ in range(dd):
-        for _ in range(aa):
-            for req in rb:
-                print(req)
-                subprocess.call("python3 -m da orig.da {} {}".format(pp, req)
-                                .split(" "))
-                subprocess.call("python3 -m da spec.da {} {}".format(pp, req)
-                                .split(" "))
-                subprocess.call("python3 -m da lamport.da {} {}".format(pp, req)
-                                .split(" "))
-
-    for _ in range(dd):
-        for _ in range(aa):
-            for proc in pb:
-                print(proc)
-                subprocess.call("python3 -m da orig.da {} {}".format(proc, rr)
-                                .split(" "))
-                subprocess.call("python3 -m da spec.da {} {}".format(proc, rr)
-                                .split(" "))
-                subprocess.call("python3 -m da lamport.da {} {}".format(proc, rr)
-                                .split(" "))
+    # correctness_testing(pp, rr, nn)
+    performance_testing(pp, rr, dd, aa)
