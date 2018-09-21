@@ -4,15 +4,12 @@ from test import Test
 import controller
 
 class P(process, controller.Controllee):
-# class P(process):
     def setup(ctl, s:set, test:Test, nrequests:int):  # s is set of all other processes
-    # def setup(s:set, test:Test, nrequests:int):  # s is set of all other processes
         super().setup(ctl)
         self.q = set()
 
     def request_resource():
         -- request
-        output('Requesting resource')
         c = logical_clock()
         send(('request', c, self), to= s)
         q.add(('request', c, self))
@@ -23,12 +20,11 @@ class P(process, controller.Controllee):
                    has= (c2, p)==(c, self) or (c, self) < (c2, p)) and
               each(p in s, has= some(received(('ack', c2, _p)), has= c2 > c)))
         -- critical_section
-        send(('log', c, 'Enter CS', self), to= test)
+        send(('log', c, 'CS', self), to= test)
         task()
 
     def release_resource(c):
         -- release
-        output('Releasing resource')
         q.remove(('request', c, self))
         lc = logical_clock()
         send(('log', lc, 'Release', self), to= test)
@@ -51,19 +47,6 @@ class P(process, controller.Controllee):
     def run():
         def task():
             output('in cs')
-        # request_type = [0] * nrequests
-        # request_processed = []
-        # logical_clocks = [-1] * nrequests
-        # while len(request_processed) < nrequests:
-        #     index = random.randint(0, nrequests - 1)
-        #     if request_type[index] == 0:
-        #         logical_clocks[index] = request_resource()
-        #     elif request_type[index] == 1:
-        #         critical_section(logical_clocks[index], task)
-        #     elif request_type[index] == 2:
-        #         release_resource(logical_clocks[index])
-        #         request_processed.append(index)
-        #     request_type[index] += 1
         logical_clocks = [-1] * nrequests
         RCF = [0, 0, 0]
         while True:
