@@ -1,15 +1,40 @@
+import time
+
 class Test(process):
     def setup(s:set, nrequests:int):
         self.logs = []
-        pass
 
     def receive(msg= ('log', logical_clock, data, p)):
         logs.append(('log', logical_clock, data, p))
 
+    def test_correctness(logs, liveness_violated):
+        f = open("correctness_logs", "w")
+        logs = sorted(logs, key=lambda x: x[1])
+
+        safety_violated = False
+        for ii in range(len(logs) - 1):
+            if logs[ii][2] == 'CS' and logs[ii + 1][2] != 'RELEASE':
+                safety_violated = True
+
+        f.write(str(safety_violated) + "\n")
+        f.write(str(liveness_violated))
+        f.close()
+
     def run():
+        timeout = 2
+        liveness_violated = False
+        start_time = time.time()
+        prev_len = len(logs)
+        while len(logs) < 2 * nrequests * len(s):
+            -- liveness
+            if len(logs) > prev_len:
+                start_time = time.time()
+                prev_len = len(logs)
+            elif time.time() - start_time >= timeout:
+                liveness_violated = True
+                break
+
         send(('done', self), to= parent())
         await(received(('done',), from_= parent()))
-        logs = sorted(logs, key=lambda x: x[3])
-        for log in logs:
-            print(log)
         output('Test terminating')
+        test_correctness(logs, liveness_violated)

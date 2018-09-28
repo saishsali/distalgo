@@ -8,7 +8,9 @@ algorithms = ['orig.da', 'spec.da', 'lamport.da']
 
 def get_performance_parameters():
     f = open("performance_logs", "r")
-    return json.loads(f.readline())['All']
+    data = json.loads(f.readline())['All']
+    f.close()
+    return data
 
 def get_average_performance(performance_params):
     average_performance = {}
@@ -23,14 +25,28 @@ def get_average_performance(performance_params):
 
     return average_performance
 
+def get_correctness_parameters():
+    f = open("correctness_logs", "r")
+    safety, liveness = f.readline(), f.readline()
+    f.close()
+    return safety, liveness
+
 # Correctness testing
 def correctness_testing(pp, rr, nn):
+    corr_table = PrettyTable()
+    corr_table.field_names = ["Algorithm", "Total Processes", "Requests",
+                              "Safety violation", "Liveness violation"]
+
     for _ in range(nn):
         proc = random.randint(1, pp)
         req = random.randint(1, rr)
         for algo in algorithms:
-            subprocess.call("python3 -m da {} {} {}".format(algo, proc, req)
+            subprocess.call("python -m da {} {} {}".format(algo, proc, req)
                             .split(" "))
+            safety, liveness = get_correctness_parameters()
+            corr_table.add_row([algo, proc, req, safety, liveness])
+
+    return corr_table
 
 # Performance testing
 def performance_testing(pp, rr, dd, aa):
@@ -46,7 +62,7 @@ def performance_testing(pp, rr, dd, aa):
         for algo in algorithms:
             performance = []
             for _ in range(aa):
-                subprocess.call("python3 -m da {} {} {}".format(algo, pp, req)
+                subprocess.call("python -m da {} {} {}".format(algo, pp, req)
                                 .split(" "))
                 performance.append(get_performance_parameters())
             avg_perf = get_average_performance(performance)
@@ -62,7 +78,7 @@ def performance_testing(pp, rr, dd, aa):
         for algo in algorithms:
             performance = []
             for _ in range(aa):
-                subprocess.call("python3 -m da {} {} {}".format(algo, proc, rr)
+                subprocess.call("python -m da {} {} {}".format(algo, proc, rr)
                                 .split(" "))
                 performance.append(get_performance_parameters())
             avg_perf = get_average_performance(performance)
@@ -70,8 +86,7 @@ def performance_testing(pp, rr, dd, aa):
                 avg_perf['Total_system_time'], avg_perf['Total_process_time'],
                 avg_perf['Total_memory']]);
 
-    print(request_table)
-    print(process_table)
+    return request_table, process_table
 
 def main():
     pp = int(sys.argv[1]) if len(sys.argv) > 1 else 1
@@ -80,5 +95,12 @@ def main():
     dd = int(sys.argv[4]) if len(sys.argv) > 4 else 1
     aa = int(sys.argv[5]) if len(sys.argv) > 5 else 1
 
-    # correctness_testing(pp, rr, nn)
-    performance_testing(pp, rr, dd, aa)
+    correctness_table = correctness_testing(pp, rr, nn)
+    request_table, process_table = performance_testing(pp, rr, dd, aa)
+
+    print("Correctness:")
+    print(correctness_table)
+    print("Performance comparison: Varying request numbers")
+    print(request_table)
+    print("Performance comparison: Varying process numbers")
+    print(process_table)

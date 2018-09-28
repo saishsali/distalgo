@@ -12,13 +12,12 @@ class P(process, controller.Controllee):
         send(('request', c, self), to= s)
         await(each(received(('request', c2, p)),
                    has= received(('release', c2, p)) or (c, self) < (c2, p))
-              and each(p in s, has= received(('ack', c, p))))
+              and each(p in s, has= received(('ack', c, p))), timeout = 3)
         -- critical_section
-        send(('log', c, 'CS', self), to= test)
         task()
         -- release
-        send(('log', c, 'Release', self), to= test)
         send(('release', c, self), to= s)
+        send(('log', logical_clock(), 'RELEASE', self), to= test)
 
     def receive(msg= ('request', c, p)):
         send(('ack', c, self), to= p)
@@ -26,8 +25,8 @@ class P(process, controller.Controllee):
     @controller.run
     def run():
         def task():
+            send(('log', logical_clock(), 'CS', self), to= test)
             output('in cs')
-            output('releasing cs')
         for i in range(nrequests):
             mutex(task)
 
