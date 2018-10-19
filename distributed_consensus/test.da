@@ -1,0 +1,31 @@
+import time
+
+class Test(process):
+    def setup(nlearners:int):
+        self.chosen_value = None
+        self.current_value = None
+        self.learners = set()
+
+    def receive(msg= ('log', value, learner)):
+        print('Test log received')
+        if chosen_value == None:
+            chosen_value = value
+        learners.add(learner)
+        current_value = value
+
+    def run():
+        correctness_violated = False
+        while len(learners) < nlearners:
+            -- correctness
+            if current_value != chosen_value:
+                correctness_violated = True
+                break
+
+        if correctness_violated:
+            print('Correctness violated')
+        else:
+            print('Correctness verified')
+
+        await(received(('done',), from_= parent()))
+        print('Test terminating')
+

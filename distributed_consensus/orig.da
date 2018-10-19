@@ -1,5 +1,6 @@
 import sys
 from random import randint
+from test import Test
 TIMEOUT = 1
 
 class Proposer(process):
@@ -64,13 +65,14 @@ class Acceptor(process):
         return next(iter(s)) if s else None
 
 class Learner(process):
-    def setup(acceptors:set): pass
+    def setup(acceptors:set, test:Test): pass
 
     def learn():
         if await(some(received(('accepted', n, v)),
                       has= len(setof(a, received(('accepted', _n, _v), from_=a)))
                            > len(acceptors)/2)):
             output('learned', n, v)
+            send(('log', v, self), to= test)
 
         elif timeout(TIMEOUT * 10):
             output('failed learning anything')
@@ -87,13 +89,15 @@ def main():
 
     acceptors = new(Acceptor, num= nacceptors)
     proposers = new(Proposer, (acceptors,), num= nproposers)
-    learners = new(Learner, (acceptors,), num= nlearners)
+    test = new(Test, num= 1)
+    setup(test, (nlearners,))
+    learners = new(Learner, (acceptors, test,), num= nlearners)
     for p in acceptors: setup(p, (learners,))
-    start(acceptors | proposers | learners)
+    start(acceptors | proposers | learners | test)
 
     await(each(l in learners, has=received(('learned',), from_=l)))
     output('done')
-    send(('done',), to= (acceptors|proposers))
+    send(('done',), to= (acceptors|proposers|test))
 
 # This is an executable specification of the algorithm described in
 # Lamport, L. (2001).  Paxos Made Simple.  ACM SIGACT News
