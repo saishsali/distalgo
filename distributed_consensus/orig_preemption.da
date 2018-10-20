@@ -26,7 +26,13 @@ class Proposer(process, controller.Controllee):
             send(('prepare', n), to= majority)
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
-                 > len(acceptors)/2):
+                 > len(acceptors)/2 or
+                 len(setof(a, received(('reject', _n, q), from_ =a))) > 0):
+            rejects = setof(p_num, received(('reject', _n, p_num), from_ =a))
+            if len(rejects) > 0:
+                output('Proposal rejected', n)
+                n = (max(max(rejects), n[0]), self)
+                return
             v = anyof(setof(v, received(('respond', _n, (n2, v))),
                             n2==max(setof(n2, received(('respond', _n, (n2, _))))))
                       or {randint(1,100)})  # any value, pick in 1..100
@@ -58,6 +64,12 @@ class Acceptor(process, controller.Controllee):
                                n==max(setof(n, sent(('accepted', n, _))))))
             if message_loss_delay(message_loss, message_delay):
                 send(('respond', n, maxprop), to =p)
+        else:
+            max_n = anyof(setof(n[0], sent(('respond', n, _)),
+                               n==max(setof(n, sent(('respond', n, _))))))
+            output('Rejecting', n)
+            if message_loss_delay(message_loss, message_delay):
+                send(('reject', n, max_n), to =p)
 
     def receive(msg= ('accept', n, v)):
         if not some(sent(('respond', n2, _)), has= n2 > n):
