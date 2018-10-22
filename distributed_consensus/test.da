@@ -6,6 +6,11 @@ class Test(process):
         self.correctness_violated = False
         self.learners = set()
 
+    def report_correctness():
+        f = open("correctness_logs", "w")
+        f.write(str(0 if correctness_violated else 1))
+        f.close()
+
     def receive(msg= ('log', value, learner)):
         print('Test process: Log received')
         if chosen_value == None:
@@ -21,8 +26,10 @@ class Test(process):
             else:
                 print('Test process: Correctness verified')
         elif timeout(test_timeout):
+            correctness_violated = True
             output('Test process: Timed out')
 
         await(received(('done',), from_= parent()))
+        report_correctness()
         print('Test process: Terminated')
 
