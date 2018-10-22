@@ -4,100 +4,126 @@ import random
 import json
 import statistics
 from prettytable import PrettyTable
+import matplotlib.pyplot as plt
 
 algorithms = ['orig.da', 'preemption.da']
+performance_stats = ['user_time', 'system_time', 'process_time', 'wallclock_time']
+variable_stats = {
+    'msg_loss'  : 'Message loss rate',
+    'msg_delay' : 'Message delay',
+    'wait_time' : 'Wait time'
+}
 
 def get_performance_parameters():
     f = open("performance_logs", "r")
     data = json.loads(f.readline())
     params = data['All']
-    params['Wallclock_time'] = data['Wallclock_time']
+    params['Total_wallclock_time'] = data['Wallclock_time']
     f.close()
     return params
 
-def get_average_performance(performance_params):
-    average_performance = {}
-    for performance_param in performance_params:
-        for key, value in performance_param.items():
-            average_performance[key] = average_performance.get(key, 0) + \
-                                        performance_param[key]
+def get_performance_statistics(performance_params):
+    performance = {}
+    for param in performance_params:
+        for key, value in param.items():
+            performance.setdefault(key, []).append(float(round(param[key], 3)))
 
-    for key, value in average_performance.items():
-        average_performance[key] /= len(performance_params)
-        average_performance[key] = round(average_performance[key], 5)
+    perf_average, perf_std_deviation, perf_range = {}, {}, {}
+    for key, stats in performance.items():
+        perf_std_deviation[key] = float(round(statistics.stdev(stats), 3))
+        perf_average[key] = float(round(sum(stats) / len(stats), 3))
+        perf_range[key] = float(round(max(stats)  - min(stats), 3))
 
-    return average_performance
+    return perf_average, perf_std_deviation, perf_range
 
-def get_standard_deviation(performance_params):
-    standard_deviation = {}
-    for performance_param in performance_params:
-        for key, value in performance_param.items():
-            standard_deviation.setdefault(key, []).append(
-                performance_param[key])
+def add_plot_data(plot_dict, avg_perf, std_dev):
+    for stat in performance_stats:
+        plot_dict.setdefault('avg_' + stat, []).append(
+                             avg_perf['Total_' + stat])
+        plot_dict.setdefault('std_' + stat, []).append(
+                             std_dev['Total_' + stat])
 
-    for key, value in standard_deviation.items():
-        standard_deviation[key] = statistics.stdev(value)
+def add_row_to_table(table, algo, variable_stat, stats):
+    table.add_row([algo, variable_stat, stats['Total_user_time'],
+                   stats['Total_system_time'], stats['Total_process_time'],
+                   stats['Total_wallclock_time'], stats['Total_memory']])
 
-    return standard_deviation
+def plot_graph(data, x_param):
+    for stat in performance_stats:
+        plt.xlabel(x_param)
+        plt.ylabel(stat)
+        for algo in algorithms:
+            plt.plot(data[algo][x_param], data[algo]['avg_' + stat], label = algo + ' Average')
+            plt.plot(data[algo][x_param], data[algo]['std_' + stat], label = algo + ' Standard Deviation')
+        plt.legend()
+        plt.savefig(x_param + '_' + stat)
+        plt.clf()
 
-# Performance testing
-def performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl):
-    r_round = int(rr * 100)
-    rb = [ii / 100 for ii in range(1, r_round + 1) if ii % (r_round / nn) == 0]
-    db = [ii for ii in range(1, dd + 1) if ii % (dd / nn) == 0]
-    wb = [ii for ii in range(1, ww + 1) if ii % (ww / nn) == 0]
+def print_arguments(pp, aa, ll, nn, rr, dd, ww, tp, tl):
+    print('Number of proposers: {}'.format(pp))
+    print('Number of acceptors: {}'.format(aa))
+    print('Number of learners: {}'.format(ll))
+    print('Number of repititions of each run: {}'.format(nn))
+    print('Message loss rate: {}'.format(rr))
+    print('Message delay: {}'.format(dd))
+    print('Wait time: {}'.format(ww))
+    print('Proposer timeout: {}'.format(tp))
+    print('Learner timeout: {}'.format(tl))
 
-    rb = [0.1, 0.2]
-    msg_loss_table = PrettyTable()
-    msg_loss_table.field_names = ["Algorithm", "Proposers", "Acceptors",
-                                  "Learners", "Message loss rate",
-                                  "Total user time", "Std dev user time",
-                                  "Total system time", "Std dev system time",
-                                  "Total process time", "Std dev process time",
-                                  "Wallclock time", "Std dev Wallclock time",
-                                  "Total Memory", "Std dev Total Memory"]
+def parameter_testing(stat, parameter_values, pp, aa, ll, nn,
+                      dd, ww, tp, tl):
+    table_tag = "(Variable: {})".format(variable_stats[stat])
+    field_names = ["Algorithm", variable_stats[stat], "User time",
+                   "System time", "Process time", "Wallclock time",
+                   "Total Memory"]
+
+    avg_table = PrettyTable()
+    avg_table.title = 'Average of Statistics ' + table_tag
+    avg_table.field_names = field_names
+
+    stddev_table = PrettyTable()
+    stddev_table.title = 'Standard Deviation of Statistics ' + table_tag
+    stddev_table.field_names = field_names
+
+    range_table = PrettyTable()
+    range_table.title = 'Range of Statistics ' + table_tag
+    range_table.field_names = field_names
 
     message_loss_plot = {}
-    for msg_loss in rb:
+    for param in parameter_values:
         for algo in algorithms:
-            message_loss_plot[algo] = message_loss_plot.get(algo, [])
+            message_loss_plot[algo] = message_loss_plot.get(algo, {})
+            message_loss_plot[algo].setdefault(stat, []).append(param)
             performance = []
             for _ in range(nn):
                 subprocess.call("python3 -m da {} {} {} {} {} {} {} {}".format(
-                                algo, pp, aa, ll, msg_loss, dd, ww, tp, tl)
+                                algo, pp, aa, ll, param, dd, ww, tp, tl)
                                 .split(" "))
                 performance.append(get_performance_parameters())
-            avg_perf = get_average_performance(performance)
-            std_dev  = get_standard_deviation(performance)
-            message_loss_plot.setdefault('Total_user_time', []).append(
-                                         avg_perf['Total_user_time'])
-            message_loss_plot.setdefault('std_user_time', []).append(
-                                         std_dev['Total_user_time'])
-            message_loss_plot.setdefault('Total_system_time', []).append(
-                                         avg_perf['Total_system_time'])
-            message_loss_plot.setdefault('std_system_time', []).append(
-                                         std_dev['Total_system_time'])
-            message_loss_plot.setdefault('Total_process_time', []).append(
-                                         avg_perf['Total_process_time'])
-            message_loss_plot.setdefault('std_process_time', []).append(
-                                         std_dev['Total_process_time'])
-            message_loss_plot.setdefault('Wallclock_time', []).append(
-                                         avg_perf['Wallclock_time'])
-            message_loss_plot.setdefault('std_Wallclock_time', []).append(
-                                         std_dev['Wallclock_time'])
-            msg_loss_table.add_row([algo, pp, aa, ll, msg_loss,
-                                    avg_perf['Total_user_time'],
-                                    std_dev['Total_user_time'],
-                                    avg_perf['Total_system_time'],
-                                    std_dev['Total_system_time'],
-                                    avg_perf['Total_process_time'],
-                                    std_dev['Total_process_time'],
-                                    avg_perf['Wallclock_time'],
-                                    std_dev['Wallclock_time'],
-                                    avg_perf['Total_memory'],
-                                    std_dev['Total_memory']]);
+            avg_perf, std_dev, perf_range = get_performance_statistics(performance)
+            add_plot_data(message_loss_plot[algo], avg_perf, std_dev)
+            add_row_to_table(avg_table, algo, param, avg_perf)
+            add_row_to_table(stddev_table, algo, param, std_dev)
+            add_row_to_table(range_table, algo, param, perf_range)
 
-    print(msg_loss_table)
+    plot_graph(message_loss_plot, stat)
+    return avg_table, stddev_table, range_table
+
+# Performance testing
+def performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl):
+    r_pct = int(rr * 100)
+    num_slots = 2
+    msg_loss_rates = [ii / 100 for ii in range(1, r_pct + 1) if ii % (r_pct / num_slots) == 0]
+    msg_delays = [ii for ii in range(1, dd + 1) if ii % (dd / num_slots) == 0]
+    wait_times = [ii for ii in range(1, ww + 1) if ii % (ww / num_slots) == 0]
+
+    msg_loss_rate_stats = parameter_testing('msg_loss', msg_loss_rates, pp, aa,
+                                            ll, nn, dd, ww, tp, tl)
+    msg_delay_stats = parameter_testing('msg_delay', msg_delays, pp, aa, ll, nn,
+                                        dd, ww, tp, tl)
+    wait_time_stats = parameter_testing('wait_time', wait_times, pp, aa, ll, nn,
+                                        dd, ww, tp, tl)
+    return msg_loss_rate_stats, msg_delay_stats, wait_time_stats
 
 def main():
     pp = int(sys.argv[1]) if len(sys.argv) > 1 else 3
@@ -110,4 +136,9 @@ def main():
     tp = int(sys.argv[8]) if len(sys.argv) > 8 else 1
     tl = int(sys.argv[9]) if len(sys.argv) > 9 else 10
 
-    performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl);
+    performance_results = performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl)
+    print_arguments(pp, aa, ll, nn, rr, dd, ww, tp, tl)
+
+    for performance_result in performance_results:
+        for ii in range(0, 3):
+            print(performance_result[ii])
