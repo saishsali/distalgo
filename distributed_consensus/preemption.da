@@ -26,13 +26,7 @@ class Proposer(process, controller.Controllee):
             send(('prepare', n), to= majority)
 
         if await(len(setof(a, received(('respond', _n, _), from_ =a)))
-                 > len(acceptors)/2 or
-                 len(setof(a, received(('reject', _n, q), from_ =a))) > 0):
-            rejects = setof(p_num, received(('reject', _n, p_num), from_ =a))
-            if len(rejects) > 0:
-                output('Proposal rejected', n)
-                n = (max(max(rejects), n[0]), self)
-                return
+                 > len(acceptors)/2):
             v = anyof(setof(v, received(('respond', _n, (n2, v))),
                             n2==max(setof(n2, received(('respond', _n, (n2, _))))))
                       or {randint(1,100)})  # any value, pick in 1..100
@@ -40,7 +34,9 @@ class Proposer(process, controller.Controllee):
             if message_loss_delay(message_loss, message_delay):
                 send(('accept', n, v), to= responded)
             debug('### chose', n, v)
-
+        elif some(received(('preempt', _n, maxprop)), has= n < maxprop):
+            output('Proposal preempted', n)
+            n = maxprop
         elif timeout(proposer_timeout):
             output('failed proposal number', n)
 
@@ -65,11 +61,11 @@ class Acceptor(process, controller.Controllee):
             if message_loss_delay(message_loss, message_delay):
                 send(('respond', n, maxprop), to =p)
         else:
-            max_n = anyof(setof(n[0], sent(('respond', n, _)),
-                               n==max(setof(n, sent(('respond', n, _))))))
-            output('Rejecting', n)
+            maxprop = anyof(setof(n, sent(('respond', n, v)),
+                               n==max(setof(n, sent(('respond', n, v))))))
+            output('Preempting', n)
             if message_loss_delay(message_loss, message_delay):
-                send(('reject', n, max_n), to =p)
+                send(('preempt', n, maxprop), to =p)
 
     def receive(msg= ('accept', n, v)):
         if not some(sent(('respond', n2, _)), has= n2 > n):
@@ -107,13 +103,13 @@ class Learner(process, controller.Controllee):
 
 def main():
     nacceptors = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    nproposers = int(sys.argv[2]) if len(sys.argv) > 2 else 5
+    nproposers = int(sys.argv[2]) if len(sys.argv) > 2 else 3
     nlearners = int(sys.argv[3]) if len(sys.argv) > 3 else 3
     message_loss = int(float(sys.argv[4]) * 100) if len(sys.argv) > 4 else 0
     message_delay = int(sys.argv[5]) if len(sys.argv) > 5 else 0
     wait_time = int(sys.argv[6]) if len(sys.argv) > 6 else 0
-    proposer_timeout = int(sys.argv[7]) if len(sys.argv) > 7 else 1
-    learner_timeout = int(sys.argv[8]) if len(sys.argv) > 8 else 10
+    proposer_timeout = int(sys.argv[7]) if len(sys.argv) > 7 else max(1, message_delay * 10)
+    learner_timeout = int(sys.argv[8]) if len(sys.argv) > 8 else max(10, message_delay * 10)
 
     ctl = new(controller.Controller, num= 1)
     setup(ctl, (nacceptors + nproposers + nlearners,))
