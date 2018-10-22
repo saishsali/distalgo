@@ -60,6 +60,9 @@ def plot_graph(data, x_param):
         plt.clf()
 
 def print_arguments(pp, aa, ll, nn, rr, dd, ww, tp, tl):
+    print('**************************************')
+    print('              ARGUMENTS               ')
+    print('**************************************')
     print('Number of proposers: {}'.format(pp))
     print('Number of acceptors: {}'.format(aa))
     print('Number of learners: {}'.format(ll))
@@ -69,6 +72,17 @@ def print_arguments(pp, aa, ll, nn, rr, dd, ww, tp, tl):
     print('Wait time: {}'.format(ww))
     print('Proposer timeout: {}'.format(tp))
     print('Learner timeout: {}'.format(tl))
+    print('**************************************')
+
+def print_current_execution(stat, value, algo, ii):
+    print('**************************************')
+    print('          CURRENT EXECUTION           ')
+    print('**************************************')
+    print('Variable stat: {}'.format(stat))
+    print('Variable stat value: {}'.format(value))
+    print('Algorithm: {}'.format(algo))
+    print('Repition number: {}'.format(ii))
+    print('**************************************')
 
 def parameter_testing(stat, parameter_values, pp, aa, ll, nn,
                       dd, ww, tp, tl):
@@ -95,7 +109,8 @@ def parameter_testing(stat, parameter_values, pp, aa, ll, nn,
             message_loss_plot[algo] = message_loss_plot.get(algo, {})
             message_loss_plot[algo].setdefault(stat, []).append(param)
             performance = []
-            for _ in range(nn):
+            for ii in range(nn):
+                print_current_execution(stat, param, algo, ii)
                 subprocess.call("python3 -m da {} {} {} {} {} {} {} {}".format(
                                 algo, pp, aa, ll, param, dd, ww, tp, tl)
                                 .split(" "))
@@ -111,11 +126,14 @@ def parameter_testing(stat, parameter_values, pp, aa, ll, nn,
 
 # Performance testing
 def performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl):
-    r_pct = int(rr * 100)
-    num_slots = 2
-    msg_loss_rates = [ii / 100 for ii in range(1, r_pct + 1) if ii % (r_pct / num_slots) == 0]
-    msg_delays = [ii for ii in range(1, dd + 1) if ii % (dd / num_slots) == 0]
-    wait_times = [ii for ii in range(1, ww + 1) if ii % (ww / num_slots) == 0]
+    # r_pct = int(rr * 100)
+    # num_slots = 10
+    # msg_loss_rates = [ii / 100 for ii in range(1, r_pct + 1) if ii % (r_pct / num_slots) == 0]
+    # msg_delays = [ii for ii in range(1, dd + 1) if ii % (dd / num_slots) == 0]
+    # wait_times = [ii for ii in range(1, ww + 1) if ii % (ww / num_slots) == 0]
+    msg_loss_rates = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+    msg_delays = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    wait_times = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     msg_loss_rate_stats = parameter_testing('msg_loss', msg_loss_rates, pp, aa,
                                             ll, nn, dd, ww, tp, tl)
@@ -133,8 +151,8 @@ def main():
     rr = float(sys.argv[5]) if len(sys.argv) > 5 else 0
     dd = int(sys.argv[6]) if len(sys.argv) > 6 else 0
     ww = int(sys.argv[7]) if len(sys.argv) > 7 else 0
-    tp = int(sys.argv[8]) if len(sys.argv) > 8 else 1
-    tl = int(sys.argv[9]) if len(sys.argv) > 9 else 10
+    tp = int(sys.argv[8]) if len(sys.argv) > 8 else max(1, dd * 10)
+    tl = int(sys.argv[9]) if len(sys.argv) > 9 else max(10, dd * 10)
 
     performance_results = performance_testing(pp, aa, ll, nn, rr, dd, ww, tp, tl)
     print_arguments(pp, aa, ll, nn, rr, dd, ww, tp, tl)
